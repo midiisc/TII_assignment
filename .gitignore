@@ -2,6 +2,13 @@
 data/
 *.db3
 *.bag
+*.mcap
+
+# Docker cache and large files
+docker/cache/
+*.tar.xz
+*.tar.gz
+*.zip
 
 # Generated outputs
 reports/visualizations/*.mp4

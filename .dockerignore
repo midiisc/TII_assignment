@@ -1,0 +1,39 @@
+# Exclude large data files from Docker build context
+data/
+*.db3
+*.mcap
+*.bag
+
+# Exclude build artifacts
+build/
+install/
+log/
+*.o
+*.so
+*.a
+
+# Exclude reports and outputs (will be mounted as volumes)
+reports/
+results/
+*.mp4
+*.png
+*.pdf
+
+# Exclude git and IDE files
+.git/
+.vscode/
+.gitignore
+
+# Exclude Python artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Exclude temporary files
+*.tmp
+*.log
+*.swp
+*~
+
+# Include cache directory for manual dependencies
+!docker/cache/

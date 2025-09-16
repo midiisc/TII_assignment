@@ -1,0 +1,32 @@
+%YAML:1.0
+---
+Camera.fx: 987.1361
+Camera.fy: 979.9493
+Camera.cx: 976.4698
+Camera.cy: 581.6855
+Camera.k1: -0.2862369
+Camera.k2: 0.06145332
+Camera.p1: -0.0007853099
+Camera.p2: -0.001011811
+Camera.k3: 0.0
+Camera.width: 1920
+Camera.height: 1080
+Camera.fps: 27.0
+Camera.RGB: 0
+ORBextractor.nFeatures: 1000
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3
+Viewer.ViewpointX: 0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500
+System.LoadAtlasFromFile: 0
+System.SaveAtlasToFile: 0

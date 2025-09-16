@@ -1,233 +1,301 @@
-# TII Assignment - Visual Localization Analysis (Final)
+# dive
+[![GitHub release](https://img.shields.io/github/release/wagoodman/dive.svg)](https://github.com/wagoodman/dive/releases/latest)
+[![Validations](https://github.com/wagoodman/dive/actions/workflows/validations.yaml/badge.svg)](https://github.com/wagoodman/dive/actions/workflows/validations.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wagoodman/dive)](https://goreportcard.com/report/github.com/wagoodman/dive)
+[![License: MIT](https://img.shields.io/badge/License-MIT%202.0-blue.svg)](https://github.com/wagoodman/dive/blob/main/LICENSE)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg?style=flat)](https://www.paypal.me/wagoodman)
 
-## 🎯 **Project Overview**
-Complete analysis of ROS bag data for visual localization approach design. This project provides comprehensive data analysis, video generation, and engineering recommendations for implementing SLAM-based visual localization.
+**A tool for exploring a docker image, layer contents, and discovering ways to shrink the size of your Docker/OCI image.**
 
-## 📁 **Final Organized Project Structure**
-```
-TII_assignment/
-├── 📊 scripts/                           # Essential analysis tools (4 files)
-│   ├── complete_rosbag_analyzer.py       # 🚀 MAIN SCRIPT - Complete analysis + PDF generation
-│   ├── video_generator.py                # Memory-safe video generation
-│   ├── adaptive_color_trajectory_plotter.py  # Advanced visualizations
-│   └── weasyprint_pdf_generator.py       # PDF generation utility
-├── 📂 data/                              # ROS bag data (4 files)
-│   ├── log_0_ros2/                      # Large bag (45.9 GB, 299.9s, 535.7m)
-│   ├── log_1_ros2/                      # Small bag (42.1s, 103.2m)
-│   ├── log_0.bag                        # Original ROS1 bag (backup)
-│   └── log_1.bag                        # Original ROS1 bag (backup)
-├── 📂 question/                          # Assignment documentation
-│   └── Assignment - ground vehicles localization - Visual Localization.pdf
-├── 📋 reports/                           # Organized analysis results
-│   ├── analysis/                         # Detailed analysis reports
-│   │   ├── complete_analysis_report.md   # 📋 COMPREHENSIVE ANALYSIS REPORT
-│   │   └── complete_analysis_report.pdf  # 📄 PDF VERSION
-│   ├── summaries/                        # Project summaries
-│   │   ├── FINAL_PROJECT_SUMMARY.md     # 📋 FINAL PROJECT SUMMARY
-│   │   ├── FINAL_PROJECT_SUMMARY.pdf    # 📄 PDF VERSION
-│   │   ├── README_FINAL.md              # 📋 COMPLETE DOCUMENTATION
-│   │   └── README_FINAL.pdf             # 📄 PDF VERSION
-│   └── visualizations/                   # Generated plots and videos
-│       ├── log_0_ros2_complete_analysis.png
-│       ├── log_1_ros2_complete_analysis.png
-│       ├── log_0_ros2_adaptive_color_analysis.png
-│       └── log_1_ros2_adaptive_color_analysis.png
-└── 📚 README.md                          # This file
-```
 
-**Total Files**: 13 essential files (down from 50+ debug files)  
-**Folder Structure**: Clean, professional, organized
+![Image](.data/demo.gif)
 
----
-
-## 🚀 **Single Command Analysis**
-
-### **Complete Analysis (Recommended)**
+To analyze a Docker image simply run dive with an image tag/id/digest:
 ```bash
-# Activate environment
-eval "$(mamba shell hook --shell bash)"
-mamba activate ros2_analysis
-
-# Run complete analysis (everything in one command)
-python3 scripts/complete_rosbag_analyzer.py data/log_0_ros2 data/log_1_ros2
+dive <your-image-tag>
 ```
 
-**Output**: 
-- Complete analysis report (Markdown + PDF)
-- 12-panel visualizations for both bags
-- Organized in `reports/` folder structure
+or you can dive with docker command directly
+```
+alias dive="docker run -ti --rm  -v /var/run/docker.sock:/var/run/docker.sock wagoodman/dive"
+dive <your-image-tag>
 
-### **Optional: Generate Videos**
+# for example
+dive nginx:latest
+```
+
+or if you want to build your image then jump straight into analyzing it:
 ```bash
-python3 scripts/video_generator.py data/log_0_ros2 data/log_1_ros2
+dive build -t <some-tag> .
 ```
 
-### **Optional: Advanced Visualizations**
+Building on Macbook (supporting only the Docker container engine)
+
 ```bash
-python3 scripts/adaptive_color_trajectory_plotter.py data/log_0_ros2 data/log_1_ros2
+docker run --rm -it \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v  "$(pwd)":"$(pwd)" \
+      -w "$(pwd)" \
+      -v "$HOME/.dive.yaml":"$HOME/.dive.yaml" \
+      wagoodman/dive:latest build -t <some-tag> .
 ```
 
-### **Optional: Generate PDFs for All Reports**
+Additionally you can run this in your CI pipeline to ensure you're keeping wasted space to a minimum (this skips the UI):
+```
+CI=true dive <your-image>
+```
+
+![Image](.data/demo-ci.png)
+
+**This is beta quality!** *Feel free to submit an issue if you want a new feature or find a bug :)*
+
+## Basic Features
+
+**Show Docker image contents broken down by layer**
+
+As you select a layer on the left, you are shown the contents of that layer combined with all previous layers on the right. Also, you can fully explore the file tree with the arrow keys.
+
+**Indicate what's changed in each layer**
+
+Files that have changed, been modified, added, or removed are indicated in the file tree. This can be adjusted to show changes for a specific layer, or aggregated changes up to this layer.
+
+**Estimate "image efficiency"**
+
+The lower left pane shows basic layer info and an experimental metric that will guess how much wasted space your image contains. This might be from duplicating files across layers, moving files across layers, or not fully removing files. Both a percentage "score" and total wasted file space is provided.
+
+**Quick build/analysis cycles**
+
+You can build a Docker image and do an immediate analysis with one command:
+`dive build -t some-tag .`
+
+You only need to replace your `docker build` command with the same `dive build`
+command.
+
+**CI Integration**
+
+Analyze an image and get a pass/fail result based on the image efficiency and wasted space. Simply set `CI=true` in the environment when invoking any valid dive command.
+
+**Multiple Image Sources and Container Engines Supported**
+
+With the `--source` option, you can select where to fetch the container image from:
 ```bash
-python3 scripts/weasyprint_pdf_generator.py
+dive <your-image> --source <source>
+```
+or
+```bash
+dive <source>://<your-image>
 ```
 
----
+With valid `source` options as such:
+- `docker`: Docker engine (the default option)
+- `docker-archive`: A Docker Tar Archive from disk
+- `podman`: Podman engine (linux only)
 
-## 📊 **Key Analysis Results**
+## Installation
 
-### **Data Quality Assessment**
-| Metric | Status | Details |
-|--------|--------|---------|
-| **Camera Data** | ✅ Excellent | 1920x1080 @ 26-27 Hz, consistent quality |
-| **IMU Data** | ✅ Good | Realistic accelerations and angular velocities |
-| **Motion Type** | ✅ Perfect | Completely planar (Z=0 throughout) |
-| **GPS Coverage** | ❌ None | 0% coverage (GPS-denied environment) |
-| **Ground Truth** | ✅ Reliable | `/mbuggy/odom` provides excellent reference |
+**Ubuntu/Debian**
+```bash
+export DIVE_VERSION=$(curl -sL "https://api.github.com/repos/wagoodman/dive/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
+sudo apt install ./dive_${DIVE_VERSION}_linux_amd64.deb
+```
 
-### **Corrected Trajectory Statistics**
-| Metric | log_0_ros2 (Large) | log_1_ros2 (Small) | Combined |
-|--------|-------------------|-------------------|----------|
-| **Distance** | 535.7m | 103.2m | 638.9m |
-| **Duration** | 299.9s | 42.1s | 342.0s |
-| **Average Speed** | 1.80 m/s | 2.47 m/s | 2.0 m/s |
-| **Max Speed** | 20.18 m/s | 9.61 m/s | 20.18 m/s |
-| **Elevation Range** | 0.00m | 0.00m | 0.00m |
-| **Motion Type** | Planar | Planar | Planar |
+**RHEL/Centos**
+```bash
+export DIVE_VERSION=$(curl -sL "https://api.github.com/repos/wagoodman/dive/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.rpm
+rpm -i dive_0.9.2_linux_amd64.rpm
+```
 
-### **Critical Findings**
-1. **GPS Coverage**: 0% (GPS-denied environment - perfect for VIO testing)
-2. **Elevation**: Completely flat (0.00m range) - ideal for 2D motion constraints
-3. **Ground Truth**: `/mbuggy/odom` is reliable and realistic
-4. **Data Quality**: Excellent for visual localization implementation
-5. **Motion Characteristics**: Realistic speeds and turning rates
+**Arch Linux**
 
----
+Available in the [extra repository](https://archlinux.org/packages/extra/x86_64/dive/) and can be installed via [pacman](https://wiki.archlinux.org/title/Pacman):
 
-## 🎯 **Visual Localization Recommendations**
+```bash
+pacman -S dive
+```
 
-### **Recommended Approach: Visual-Inertial Odometry (VIO)**
-- **Method**: ORB-SLAM3 or OpenVINS
-- **Justification**: GPS-denied environment, planar motion, rich sensor data
-- **Implementation**: 2D motion constraints, ground plane assumption
+**Mac**
 
-### **Ground Truth Sources**
-1. **Primary**: `/mbuggy/odom` - Most reliable reference
-2. **Secondary**: `/mbuggy/navsat/odometry` - Good for validation
-3. **Avoid**: `/mbuggy/septentrio/localization` - Corrupted data
+If you use [Homebrew](https://brew.sh):
 
-### **Implementation Strategy**
-1. **Use 2D motion constraints** (Z=0, planar motion)
-2. **Ground plane assumption** for scale recovery
-3. **IMU integration** for drift correction
-4. **No GPS dependency** - pure visual-inertial approach
+```bash
+brew install dive
+```
 
----
+If you use [MacPorts](https://www.macports.org):
 
-## 🔧 **Technical Features**
+```bash
+sudo port install dive
+```
 
-### **Optimization Techniques**
-- ✅ **Multi-threading**: Parallel processing across CPU cores
-- ✅ **Memory Optimization**: Stream processing architecture
-- ✅ **Hardware Monitoring**: Real-time GPU/CPU/memory monitoring
-- ✅ **Adaptive Color Scaling**: Optimal visualization ranges
-- ✅ **Sequential Processing**: SLAM-compatible data integrity
-- ✅ **PDF Generation**: Automatic PDF creation for all reports
+Or download the latest Darwin build from the [releases page](https://github.com/wagoodman/dive/releases/latest).
 
-### **Performance Metrics**
-- **Processing Time**: ~3 minutes for complete analysis
-- **Memory Usage**: <20% (ultra-conservative management)
-- **Success Rate**: 100% (no system crashes)
-- **Data Integrity**: 100% analysis success
-- **Hardware Safety**: No degradation, monitored throughout
+**Windows**
 
----
+Download the [latest release](https://github.com/wagoodman/dive/releases/latest).
 
-## 📋 **Generated Outputs**
+**Go tools**
+Requires Go version 1.10 or higher.
 
-### **Analysis Reports** (`reports/analysis/`)
-- `complete_analysis_report.md` - **Comprehensive analysis report**
-- `complete_analysis_report.pdf` - **PDF version**
+```bash
+go get github.com/wagoodman/dive
+```
+*Note*: installing in this way you will not see a proper version when running `dive -v`.
 
-### **Project Summaries** (`reports/summaries/`)
-- `FINAL_PROJECT_SUMMARY.md` - **Final project summary**
-- `FINAL_PROJECT_SUMMARY.pdf` - **PDF version**
-- `README_FINAL.md` - **Complete documentation**
-- `README_FINAL.pdf` - **PDF version**
+**Nix/NixOS**
 
-### **Visualizations** (`reports/visualizations/`)
-- `log_0_ros2_complete_analysis.png` - **12-panel analysis visualization**
-- `log_1_ros2_complete_analysis.png` - **12-panel analysis visualization**
-- `log_0_ros2_adaptive_color_analysis.png` - **Adaptive color-coded plots**
-- `log_1_ros2_adaptive_color_analysis.png` - **Adaptive color-coded plots**
+On NixOS:
+```bash
+nix-env -iA nixos.dive
+```
+On non-NixOS (Linux, Mac)
+```bash
+nix-env -iA nixpkgs.dive
+```
 
-### **Report Contents**
-- **Topic Analysis**: Frequencies, message types, data quality
-- **Trajectory Analysis**: Distance, duration, speed, turning rates
-- **GPS Analysis**: Coverage, fix types, coordinate ranges
-- **IMU Analysis**: Accelerations, angular velocities
-- **Camera Analysis**: Resolution, frame rates, data sizes
-- **Static Transforms**: Coordinate frame relationships
-- **Engineering Recommendations**: VIO implementation strategy
+**Docker**
+```bash
+docker pull wagoodman/dive
+```
 
----
+or
 
-## 🎯 **Next Steps for Visual Localization**
+```bash
+docker pull quay.io/wagoodman/dive
+```
 
-### **Phase 1: Algorithm Implementation**
-1. **Install VIO Framework**: ORB-SLAM3 or OpenVINS
-2. **Setup Coordinate Frames**: Use static transforms from analysis
-3. **Configure Parameters**: Optimize for planar motion
-4. **Create Launch Files**: Complete ROS 2 pipeline
+When running you'll need to include the docker socket file:
+```bash
+docker run --rm -it \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    wagoodman/dive:latest <dive arguments...>
+```
 
-### **Phase 2: Validation & Testing**
-1. **Run on Bag Data**: Test with provided ROS bags
-2. **Compare Trajectories**: Use `/mbuggy/odom` as ground truth
-3. **Calculate Metrics**: ATE, RPE, drift analysis
-4. **Optimize Parameters**: Tune for best performance
+Docker for Windows (showing PowerShell compatible line breaks; collapse to a single line for Command Prompt compatibility)
+```bash
+docker run --rm -it `
+    -v /var/run/docker.sock:/var/run/docker.sock `
+    wagoodman/dive:latest <dive arguments...>
+```
 
-### **Phase 3: Documentation**
-1. **Technical Report**: Document approach and results
-2. **Performance Analysis**: Compare with ground truth
-3. **Recommendations**: Future improvements and optimizations
+**Note:** depending on the version of docker you are running locally you may need to specify the docker API version as an environment variable:
+```bash
+   DOCKER_API_VERSION=1.37 dive ...
+```
+or if you are running with a docker image:
+```bash
+docker run --rm -it \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -e DOCKER_API_VERSION=1.37 \
+    wagoodman/dive:latest <dive arguments...>
+```
 
----
+## CI Integration
 
-## 📞 **Support & Documentation**
+When running dive with the environment variable `CI=true` then the dive UI will be bypassed and will instead analyze your docker image, giving it a pass/fail indication via return code. Currently there are three metrics supported via a `.dive-ci` file that you can put at the root of your repo:
+```
+rules:
+  # If the efficiency is measured below X%, mark as failed.
+  # Expressed as a ratio between 0-1.
+  lowestEfficiency: 0.95
 
-### **Key Files**
-- **Main Analysis Script**: `scripts/complete_rosbag_analyzer.py`
-- **Complete Report**: `reports/analysis/complete_analysis_report.md`
-- **Project Summary**: `reports/summaries/FINAL_PROJECT_SUMMARY.md`
-- **Assignment PDF**: `question/Assignment - ground vehicles localization - Visual Localization.pdf`
+  # If the amount of wasted space is at least X or larger than X, mark as failed.
+  # Expressed in B, KB, MB, and GB.
+  highestWastedBytes: 20MB
 
-### **Usage Commands**
-- **Complete Analysis**: `python3 scripts/complete_rosbag_analyzer.py <bag_paths>`
-- **Video Generation**: `python3 scripts/video_generator.py <bag_paths>`
-- **Advanced Plots**: `python3 scripts/adaptive_color_trajectory_plotter.py <bag_paths>`
-- **PDF Generation**: `python3 scripts/weasyprint_pdf_generator.py`
+  # If the amount of wasted space makes up for X% or more of the image, mark as failed.
+  # Note: the base image layer is NOT included in the total image size.
+  # Expressed as a ratio between 0-1; fails if the threshold is met or crossed.
+  highestUserWastedPercent: 0.20
+```
+You can override the CI config path with the `--ci-config` option.
 
----
+## KeyBindings
 
-## 🎉 **Summary**
+Key Binding                                | Description
+-------------------------------------------|---------------------------------------------------------
+<kbd>Ctrl + C</kbd> or <kbd>Q</kbd>        | Exit
+<kbd>Tab</kbd>                             | Switch between the layer and filetree views
+<kbd>Ctrl + F</kbd>                        | Filter files
+<kbd>PageUp</kbd>                          | Scroll up a page
+<kbd>PageDown</kbd>                        | Scroll down a page
+<kbd>Ctrl + A</kbd>                        | Layer view: see aggregated image modifications
+<kbd>Ctrl + L</kbd>                        | Layer view: see current layer modifications
+<kbd>Space</kbd>                           | Filetree view: collapse/uncollapse a directory
+<kbd>Ctrl + Space</kbd>                    | Filetree view: collapse/uncollapse all directories
+<kbd>Ctrl + A</kbd>                        | Filetree view: show/hide added files
+<kbd>Ctrl + R</kbd>                        | Filetree view: show/hide removed files
+<kbd>Ctrl + M</kbd>                        | Filetree view: show/hide modified files
+<kbd>Ctrl + U</kbd>                        | Filetree view: show/hide unmodified files
+<kbd>Ctrl + B</kbd>                        | Filetree view: show/hide file attributes
+<kbd>PageUp</kbd>                          | Filetree view: scroll up a page
+<kbd>PageDown</kbd>                        | Filetree view: scroll down a page
 
-This project successfully completed a comprehensive analysis of ROS bag data for visual localization with:
+## UI Configuration
 
-- **Complete data analysis** with corrected statistics and realistic motion characteristics
-- **Advanced visualizations** with adaptive color scaling for optimal data interpretation
-- **Memory-safe processing** with hardware monitoring and no system crashes
-- **Consolidated toolset** with minimal, optimized scripts
-- **Organized structure** with clean folder hierarchy and PDF generation
-- **Clear recommendations** for VIO implementation with ground truth validation
+No configuration is necessary, however, you can create a config file and override values:
+```yaml
+# supported options are "docker" and "podman"
+container-engine: docker
+# continue with analysis even if there are errors parsing the image archive
+ignore-errors: false
+log:
+  enabled: true
+  path: ./dive.log
+  level: info
 
-The data is **excellent quality** for visual localization implementation, with realistic motion characteristics, planar motion, and reliable ground truth references.
+# Note: you can specify multiple bindings by separating values with a comma.
+# Note: UI hinting is derived from the first binding
+keybinding:
+  # Global bindings
+  quit: ctrl+c
+  toggle-view: tab
+  filter-files: ctrl+f, ctrl+slash
 
-**Status**: ✅ **ANALYSIS COMPLETE - READY FOR VISUAL LOCALIZATION IMPLEMENTATION**
+  # Layer view specific bindings
+  compare-all: ctrl+a
+  compare-layer: ctrl+l
 
----
+  # File view specific bindings
+  toggle-collapse-dir: space
+  toggle-collapse-all-dir: ctrl+space
+  toggle-added-files: ctrl+a
+  toggle-removed-files: ctrl+r
+  toggle-modified-files: ctrl+m
+  toggle-unmodified-files: ctrl+u
+  toggle-filetree-attributes: ctrl+b
+  page-up: pgup
+  page-down: pgdn
 
-*Generated: September 15, 2025*  
-*Total Processing Time: ~3 minutes*  
-*Success Rate: 100%*  
-*System Stability: Perfect*  
-*Organization: Professional*
+diff:
+  # You can change the default files shown in the filetree (right pane). All diff types are shown by default.
+  hide:
+    - added
+    - removed
+    - modified
+    - unmodified
+
+filetree:
+  # The default directory-collapse state
+  collapse-dir: false
+
+  # The percentage of screen width the filetree should take on the screen (must be >0 and <1)
+  pane-width: 0.5
+
+  # Show the file attributes next to the filetree
+  show-attributes: true
+
+layer:
+  # Enable showing all changes from this layer and every previous layer
+  show-aggregated-changes: false
+
+```
+
+dive will search for configs in the following locations:
+- `$XDG_CONFIG_HOME/dive/*.yaml`
+- `$XDG_CONFIG_DIRS/dive/*.yaml`
+- `~/.config/dive/*.yaml`
+- `~/.dive.yaml`
+
+`.yml` can be used instead of `.yaml` if desired.

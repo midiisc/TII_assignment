@@ -1,0 +1,442 @@
+# OpenVINS Docker Environment with CUDA 12.2 + ROS2 Humble
+# Multi-stage build for production-grade optimization
+
+# Build arguments for flexibility
+ARG CUDA_ARCH="8.6"
+ARG OPENCV_VERSION="4.8.0"
+ARG CERES_VERSION="2.1.0"
+ARG ROS_DISTRO="humble"
+ARG UBUNTU_VERSION="22.04"
+
+# STAGE 1: Builder (Development environment with all build tools)
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
+
+# Re-declare ARG variables for this stage
+ARG CUDA_ARCH="8.6"
+ARG OPENCV_VERSION="4.8.0"
+ARG CERES_VERSION="2.1.0"
+ARG ROS_DISTRO="humble"
+ARG UBUNTU_VERSION="22.04"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Set CUDA environment variables
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Set acceleration environment variables (applied after tools are installed)
+ENV PATH="/usr/lib/ccache:${PATH}"
+ENV CC="ccache gcc"
+ENV CXX="ccache g++"
+ENV CCACHE_DIR="/tmp/ccache"
+ENV CCACHE_MAXSIZE="2G"
+
+# PRIORITY 1: Install acceleration tools FIRST for maximum benefit
+RUN apt-get update && \
+    # Install essential tools for repository management
+    apt-get install -y \
+        software-properties-common \
+        apt-transport-https \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+        debconf-utils \
+        wget \
+        curl && \
+    # Enable Universe repository immediately
+    add-apt-repository universe && \
+    # Add apt-fast PPA with error handling
+    add-apt-repository -y ppa:apt-fast/stable || echo "PPA already exists" && \
+    apt-get update && \
+    # Install ALL acceleration tools in one step
+    apt-get install -y \
+        aria2 \
+        ninja-build \
+        ccache \
+        make \
+        parallel && \
+    # Configure apt-fast with debconf selections
+    echo 'apt-fast apt-fast/maxdownloads string 16' | debconf-set-selections && \
+    echo 'apt-fast apt-fast/dlflag boolean true' | debconf-set-selections && \
+    echo 'apt-fast apt-fast/aptmanager string apt-get' | debconf-set-selections && \
+    # Install apt-fast with fallback
+    apt-get install -y apt-fast || (echo "apt-fast failed, using regular apt-get" && ln -sf /usr/bin/apt-get /usr/local/bin/apt-fast) && \
+    # Setup ccache environment immediately
+    export PATH="/usr/lib/ccache:$PATH" && \
+    echo 'export PATH="/usr/lib/ccache:$PATH"' >> /etc/environment && \
+    ccache --set-config=max_size=2G && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Verify ALL acceleration tools are working
+    echo "🚀 Verifying acceleration tools:" && \
+    aria2c --version | head -1 && echo "✅ aria2c ready" && \
+    apt-fast --version | head -1 && echo "✅ apt-fast ready" && \
+    ninja --version && echo "✅ ninja ready" && \
+    ccache --version | head -1 && echo "✅ ccache ready" && \
+    echo "🎯 ALL ACCELERATION TOOLS ACTIVE!"
+
+# Install system dependencies with accelerated downloads and fallback
+RUN (apt-fast update || apt-get update) && (apt-fast install -y \
+    # Basic development tools (acceleration tools already installed above)
+    git \
+    vim \
+    htop \
+    build-essential \
+    cmake \
+    pkg-config \
+    autoconf \
+    automake \
+    libtool \
+    # Archive tools
+    unzip \
+    zip \
+    tar \
+    # Python and pip with comprehensive development headers
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-all-dev \
+    python3-numpy \
+    python3-matplotlib \
+    # ROS2 dependencies
+    locales \
+    lsb-release \
+    gnupg2 \
+    # Computer vision dependencies (OpenCV built from source, no system packages)
+    libeigen3-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libv4l-dev \
+    libxvidcore-dev \
+    libx264-dev \
+    libgtk-3-dev \
+    # Mathematical and optimization libraries
+    libgoogle-glog-dev \
+    libgflags-dev \
+    libatlas-base-dev \
+    libsuitesparse-dev \
+    gfortran \
+    # NVIDIA cuDNN for CUDA accelerated deep learning (will be installed from NVIDIA repo)
+    # libcudnn8-dev \
+    # Intel Threading Building Blocks for enhanced parallelism
+    libtbb-dev \
+    libtbb2 \
+    && rm -rf /var/lib/apt/lists/*) || (echo "⚠️ apt-fast failed, using apt-get fallback" && apt-get update && apt-get install -y \
+    git vim htop build-essential cmake pkg-config autoconf automake libtool \
+    unzip zip tar python3 python3-pip python3-dev python3-all-dev python3-numpy python3-matplotlib \
+    locales lsb-release gnupg2 libeigen3-dev \
+    libjpeg-dev libpng-dev libtiff-dev libavcodec-dev libavformat-dev libswscale-dev \
+    libv4l-dev libxvidcore-dev libx264-dev libgtk-3-dev libgoogle-glog-dev libgflags-dev \
+    libatlas-base-dev libsuitesparse-dev gfortran libtbb-dev libtbb2 \
+    && rm -rf /var/lib/apt/lists/*)
+
+# Set up locale
+RUN locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+# Add ROS2 Humble repository
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu jammy main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+# Note: cuDNN not needed since OPENCV_DNN_CUDA=OFF (OpenVINS VIO doesn't use deep learning)
+
+# Install ROS2 Humble with parallel downloads and fallback
+RUN (apt-fast update && apt-fast install -y \
+    ros-${ROS_DISTRO}-desktop \
+    ros-${ROS_DISTRO}-cv-bridge \
+    ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-sensor-msgs \
+    ros-${ROS_DISTRO}-geometry-msgs \
+    ros-${ROS_DISTRO}-nav-msgs \
+    ros-${ROS_DISTRO}-tf2 \
+    ros-${ROS_DISTRO}-tf2-ros \
+    ros-${ROS_DISTRO}-tf2-geometry-msgs \
+    ros-${ROS_DISTRO}-rosbag2 \
+    ros-${ROS_DISTRO}-rosbag2-storage-default-plugins \
+    python3-rosdep \
+    python3-colcon-common-extensions \
+    python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*) || (echo "⚠️ apt-fast failed for ROS2, using apt-get fallback" && apt-get update && apt-get install -y \
+    ros-${ROS_DISTRO}-desktop ros-${ROS_DISTRO}-cv-bridge ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-sensor-msgs ros-${ROS_DISTRO}-geometry-msgs ros-${ROS_DISTRO}-nav-msgs \
+    ros-${ROS_DISTRO}-tf2 ros-${ROS_DISTRO}-tf2-ros ros-${ROS_DISTRO}-tf2-geometry-msgs \
+    ros-${ROS_DISTRO}-rosbag2 ros-${ROS_DISTRO}-rosbag2-storage-default-plugins \
+    python3-rosdep python3-colcon-common-extensions python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*)
+
+# Initialize rosdep
+RUN rosdep init && rosdep update
+
+# Create workspace
+WORKDIR /workspace
+RUN mkdir -p /workspace/src
+
+# Build Ceres Solver from source with caching
+RUN --mount=type=cache,target=/cache/downloads,sharing=locked \
+    cd /tmp && \
+    # Check cache first, download if needed
+    if [ ! -f /cache/downloads/ceres-solver-${CERES_VERSION}.tar.gz ]; then \
+        echo "📥 Downloading Ceres Solver ${CERES_VERSION} to cache..." && \
+        # Download to temp file in current directory (/tmp)
+        (aria2c -x 8 -s 8 --max-tries=3 -o ceres-temp.tar.gz https://github.com/ceres-solver/ceres-solver/archive/${CERES_VERSION}.tar.gz || \
+        wget -O ceres-temp.tar.gz https://github.com/ceres-solver/ceres-solver/archive/${CERES_VERSION}.tar.gz) && \
+        # Ensure cache directory exists and move file to cache
+        mkdir -p /cache/downloads && \
+        mv ceres-temp.tar.gz /cache/downloads/ceres-solver-${CERES_VERSION}.tar.gz; \
+    else \
+        echo "✅ Using cached Ceres Solver ${CERES_VERSION}"; \
+    fi && \
+    # Copy from cache to working directory
+    cp /cache/downloads/ceres-solver-${CERES_VERSION}.tar.gz . && \
+    tar -xzf ceres-solver-${CERES_VERSION}.tar.gz && \
+    cd ceres-solver-${CERES_VERSION} && \
+    mkdir build && cd build && \
+    # Use Ninja for faster builds (ccache already in ENV)
+    cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_TESTING=OFF \
+          -DBUILD_EXAMPLES=OFF \
+          -DBUILD_BENCHMARKS=OFF \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
+          .. && \
+    # Memory-safe compilation for Ceres Solver
+    SAFE_JOBS=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 )) && \
+    echo "🚀 Compiling Ceres with $SAFE_JOBS parallel jobs..." && \
+    ninja -j$SAFE_JOBS && \
+    ninja install && \
+    ldconfig && \
+    cd /tmp && rm -rf ceres-solver*
+
+# Clone OpenVINS with caching
+RUN --mount=type=cache,target=/cache/git,sharing=locked \
+    cd /workspace/src && \
+    # Check if we have cached OpenVINS
+    if [ -d /cache/git/open_vins ]; then \
+        echo "✅ Using cached OpenVINS repository" && \
+        cp -r /cache/git/open_vins . && \
+        cd open_vins && \
+        git pull origin master && \
+        git submodule update --init --recursive; \
+    else \
+        echo "📥 Cloning OpenVINS to cache..." && \
+        git clone https://github.com/rpng/open_vins.git && \
+        cd open_vins && \
+        git submodule update --init --recursive && \
+        # Cache the repository
+        cp -r /workspace/src/open_vins /cache/git/; \
+    fi
+
+# Install OpenVINS dependencies (skip libceres-dev since we built from source)
+RUN cd /workspace && \
+    . /opt/ros/${ROS_DISTRO}/setup.sh && \
+    rosdep install --from-paths src --ignore-src -r -y --skip-keys="libceres-dev"
+
+# Build OpenCV with CUDA support (cached downloads)
+RUN --mount=type=cache,target=/cache/downloads,sharing=locked \
+    cd /tmp && \
+    # Check cache first for OpenCV
+    if [ ! -f /cache/downloads/opencv-${OPENCV_VERSION}.zip ]; then \
+        echo "📥 Downloading OpenCV ${OPENCV_VERSION} to cache..." && \
+        # Download to temp file in current directory (/tmp)
+        (aria2c -x 8 -s 8 --max-tries=3 --retry-wait=2 --timeout=60 --connect-timeout=30 -o opencv-temp.zip https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip || \
+         wget -O opencv-temp.zip https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip) && \
+        # Move to cache
+        mkdir -p /cache/downloads && \
+        mv opencv-temp.zip /cache/downloads/opencv-${OPENCV_VERSION}.zip; \
+    else \
+        echo "✅ Using cached OpenCV ${OPENCV_VERSION}"; \
+    fi && \
+    # Check cache for OpenCV Contrib
+    if [ ! -f /cache/downloads/opencv_contrib-${OPENCV_VERSION}.zip ]; then \
+        echo "📥 Downloading OpenCV Contrib ${OPENCV_VERSION} to cache..." && \
+        # Download to temp file in current directory (/tmp)
+        (aria2c -x 8 -s 8 --max-tries=3 --retry-wait=2 --timeout=60 --connect-timeout=30 -o opencv_contrib-temp.zip https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.zip || \
+         wget -O opencv_contrib-temp.zip https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.zip) && \
+        # Move to cache
+        mkdir -p /cache/downloads && \
+        mv opencv_contrib-temp.zip /cache/downloads/opencv_contrib-${OPENCV_VERSION}.zip; \
+    else \
+        echo "✅ Using cached OpenCV Contrib ${OPENCV_VERSION}"; \
+    fi && \
+    # Copy from cache to working directory
+    cp /cache/downloads/opencv-${OPENCV_VERSION}.zip opencv.zip && \
+    cp /cache/downloads/opencv_contrib-${OPENCV_VERSION}.zip opencv_contrib.zip && \
+    # Verify files are ready
+    echo "🔍 Verifying cached files:" && \
+    ls -la opencv*.zip && \
+    echo "✅ Cache verification complete" && \
+    # Extract with verification
+    echo "📦 Extracting OpenCV..." && \
+    unzip opencv.zip && \
+    echo "📦 Extracting OpenCV Contrib..." && \
+    unzip opencv_contrib.zip && \
+    # CUDA DNN disabled, so no patches needed for DNN modules
+    echo "✅ CUDA DNN disabled - no patches required" && \
+    mkdir -p opencv-${OPENCV_VERSION}/build && cd opencv-${OPENCV_VERSION}/build && \
+    # Verify CUDA and compiler setup
+    nvcc --version && \
+    gcc --version && \
+    python3 --version && \
+    python3 -c "import numpy; print('NumPy version:', numpy.__version__)" && \
+    # Use Ninja + ccache for faster compilation (ccache already in ENV)
+    cmake -GNinja -D CMAKE_BUILD_TYPE=RELEASE \
+          -D CMAKE_INSTALL_PREFIX=/usr/local \
+          -D CMAKE_C_COMPILER=/usr/bin/gcc \
+          -D CMAKE_CXX_COMPILER=/usr/bin/g++ \
+          -D OPENCV_EXTRA_MODULES_PATH=/tmp/opencv_contrib-${OPENCV_VERSION}/modules \
+          -D WITH_CUDA=ON \
+          -D WITH_CUDNN=OFF \
+          -D OPENCV_DNN_CUDA=OFF \
+          -D ENABLE_FAST_MATH=1 \
+          -D CUDA_FAST_MATH=1 \
+          -D CUDA_ARCH_BIN=${CUDA_ARCH} \
+          -D WITH_CUBLAS=1 \
+          -D OPENCV_ENABLE_NONFREE=ON \
+          -D BUILD_EXAMPLES=OFF \
+          -D BUILD_DOCS=OFF \
+          -D BUILD_PERF_TESTS=OFF \
+          -D BUILD_TESTS=OFF \
+          -D WITH_GTK=OFF \
+          -D WITH_GTK_2_X=OFF \
+          -D WITH_QT=OFF \
+          -D BUILD_opencv_apps=OFF \
+          -D WITH_TBB=ON \
+          -D WITH_OPENMP=ON \
+          -D WITH_IPP=ON \
+          -D PYTHON3_EXECUTABLE=/usr/bin/python3 \
+          -D PYTHON3_INCLUDE_DIR=/usr/include/python3.10 \
+          -D PYTHON3_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.10.so \
+          -D PYTHON3_NUMPY_INCLUDE_DIRS=/usr/lib/python3/dist-packages/numpy/core/include \
+          -D BUILD_opencv_python3=ON \
+          .. && \
+    # Memory-efficient compilation (CUDA DNN disabled, so much less memory-intensive)
+    SAFE_JOBS=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 )) && \
+    echo "🚀 Compiling OpenCV with $SAFE_JOBS parallel jobs (CUDA DNN disabled for memory efficiency)..." && \
+    ninja -j$SAFE_JOBS && \
+    ninja install && \
+    ldconfig && \
+    cd / && rm -rf /tmp/opencv*
+
+# Build OpenVINS with optimizations and BuildKit cache mounts
+RUN --mount=type=cache,target=/tmp/ccache,sharing=locked \
+    cd /workspace && \
+    . /opt/ros/${ROS_DISTRO}/setup.sh && \
+    # Memory-efficient parallel jobs (CUDA DNN disabled, so less memory-intensive)
+    SAFE_JOBS=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 )) && \
+    echo "🚀 Compiling OpenVINS with $SAFE_JOBS parallel jobs..." && \
+    # Use ccache and parallel builds with persistent cache
+    colcon build --cmake-args \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+        --parallel-workers $SAFE_JOBS
+
+# Install Python packages for analysis with optimizations
+RUN pip3 install --no-cache-dir \
+    numpy \
+    matplotlib \
+    scipy \
+    pandas \
+    pyyaml \
+    opencv-python \
+    rosbags
+    # Optional: GPU acceleration for Python analysis scripts
+    # cupy-cuda12x \
+    # numba \
+    # Note: Commented out as they're not needed for OpenVINS core VIO pipeline
+    # Uncomment if you want GPU acceleration for video analysis scripts
+
+# Set up environment
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
+    echo "source /workspace/install/setup.bash" >> /root/.bashrc && \
+    echo "export CUDA_VISIBLE_DEVICES=0" >> /root/.bashrc
+
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+source /opt/ros/${ROS_DISTRO}/setup.bash\n\
+source /workspace/install/setup.bash\n\
+export CUDA_VISIBLE_DEVICES=0\n\
+exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash"]
+
+# Expose common ports for visualization
+EXPOSE 8080 8081 8082
+
+# Set working directory
+WORKDIR /workspace
+
+# STAGE 2: Production Runtime Image (Optimized and lean)
+FROM nvidia/cuda:12.2.2-base-ubuntu22.04 AS runtime
+
+# Re-declare ARG variables for runtime stage
+ARG ROS_DISTRO="humble"
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Set CUDA environment variables
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Set up locale first to avoid warnings
+RUN apt-get update && apt-get install -y --no-install-recommends locales && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
+    rm -rf /var/lib/apt/lists/*
+ENV LANG=en_US.UTF-8
+
+# Install ONLY minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Essential libraries
+    python3 python3-pip curl gnupg2 lsb-release \
+    # Mathematical and utility libraries (no -dev packages, no OpenCV packages)
+    libgoogle-glog0v5 libgflags2.2 libtbb2 libatlas3-base libsuitesparse-metis5 \
+    # Add ROS2 repository
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+    # Install ROS2 BASE (not desktop) - much smaller
+    && apt-get update && apt-get install -y --no-install-recommends ros-${ROS_DISTRO}-ros-base \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built artifacts from builder stage
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /workspace/install /workspace/install
+
+# Copy entrypoint script
+COPY --from=builder /entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Install Python packages
+RUN pip3 install --no-cache-dir numpy matplotlib scipy pandas pyyaml opencv-python rosbags
+
+# Set up environment
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
+    echo "source /workspace/install/setup.bash" >> /root/.bashrc && \
+    echo "export CUDA_VISIBLE_DEVICES=0" >> /root/.bashrc
+
+# Create workspace
+WORKDIR /workspace
+
+# Expose common ports for visualization
+EXPOSE 8080 8081 8082
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash"]
+
+# Labels for production image
+LABEL maintainer="TII Assignment - OpenVINS VIO Pipeline"
+LABEL description="Production OpenVINS with CUDA 12.2, ROS2 Humble (Multi-stage optimized)"
+LABEL version="2.0"
+LABEL stage="runtime"

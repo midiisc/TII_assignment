@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  openvins:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.openvins
+    image: openvins:cuda12.2-humble
+    container_name: openvins_vio
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,display
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      # Mount ROS bag data
+      - ../data:/workspace/data:ro
+      # Mount configuration files
+      - ../config:/workspace/config:ro
+      # Mount results directory for outputs
+      - ../results:/workspace/results:rw
+      # Mount scripts for analysis
+      - ../scripts:/workspace/scripts:ro
+      # X11 socket for GUI applications
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Shared memory for performance
+      - /dev/shm:/dev/shm
+    devices:
+      - /dev/dri:/dev/dri
+    network_mode: host
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    command: /bin/bash
+
+  openvins-dev:
+    extends: openvins
+    container_name: openvins_dev
+    volumes:
+      # Additional development mounts
+      - ../data:/workspace/data:ro
+      - ../config:/workspace/config:rw
+      - ../results:/workspace/results:rw
+      - ../scripts:/workspace/scripts:rw
+      - ../reports:/workspace/reports:rw
+      # Mount source code for development
+      - openvins_src:/workspace/src
+      # Persistent workspace
+      - openvins_install:/workspace/install
+    ports:
+      - "8080:8080"  # RViz web interface
+      - "8081:8081"  # Custom visualization
+      - "8082:8082"  # Jupyter/analysis
+
+volumes:
+  openvins_src:
+    driver: local
+  openvins_install:
+    driver: local
