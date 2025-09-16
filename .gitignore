@@ -1,0 +1,46 @@
+# Data files (large ROS bags)
+data/
+*.db3
+*.bag
+
+# Generated outputs
+reports/visualizations/*.mp4
+reports/visualizations/*.avi
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+debug_*.jpg
+test_*.jpg
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
