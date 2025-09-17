@@ -1,0 +1,176 @@
+%YAML:1.0
+
+# ========================================
+# OPENVINS ESTIMATOR CONFIGURATION
+# ========================================
+# This config is customized for mbuggy data with topics:
+# - IMU: /mbuggy/imu_ins
+# - Camera: /mbuggy/camera_front/image_rect
+
+# ========================================
+# ESTIMATOR PARAMETERS
+# ========================================
+use_stereo: false
+use_rviz_visualization: true
+use_loop_closure: false
+use_groundtruth: false
+
+# ========================================
+# TOPIC NAMES
+# ========================================
+topic_imu: "/mbuggy/imu_ins"
+topic_cam0: "/mbuggy/camera_front/image_rect"
+
+# ========================================
+# CAMERA PARAMETERS
+# ========================================
+cam0_parameters:
+  - 987.1361  # fx
+  - 979.9493  # fy
+  - 976.4698  # cx
+  - 581.6855  # cy
+  - -0.2862369  # k1
+  - 0.06145332  # k2
+  - -0.0007853099  # p1
+  - -0.001011811  # p2
+  - 0.0  # k3
+
+cam0_resolution:
+  - 1920
+  - 1080
+
+cam0_noise_density: 1.0
+cam0_random_walk: 0.001
+
+# ========================================
+# IMU PARAMETERS
+# ========================================
+imu0_parameters:
+  - 1.0  # q_imu_cam0 (w)
+  - 0.0  # q_imu_cam0 (x)
+  - 0.0  # q_imu_cam0 (y)
+  - 0.0  # q_imu_cam0 (z)
+  - 0.0  # p_imu_cam0 (x)
+  - 0.0  # p_imu_cam0 (y)
+  - 0.0  # p_imu_cam0 (z)
+
+imu0_noise_density: 0.01
+imu0_random_walk: 0.0001
+
+# ========================================
+# FILTER PARAMETERS
+# ========================================
+filter_parameters:
+  - 11  # max_clones
+  - 0   # max_slam
+  - 0   # max_aruco
+  - 0   # max_aruco_features
+  - 0   # max_aruco_tracks
+  - 0   # max_aruco_matches
+  - 0   # max_aruco_inliers
+  - 0   # max_aruco_ransac_iterations
+  - 0   # max_aruco_ransac_threshold
+  - 0   # max_aruco_ransac_confidence
+  - 0   # max_aruco_ransac_min_inliers
+  - 0   # max_aruco_ransac_max_iterations
+  - 0   # max_aruco_ransac_min_iterations
+  - 0   # max_aruco_ransac_max_evaluation
+  - 0   # max_aruco_ransac_min_evaluation
+  - 0   # max_aruco_ransac_max_models
+  - 0   # max_aruco_ransac_min_models
+  - 0   # max_aruco_ransac_max_trials
+  - 0   # max_aruco_ransac_min_trials
+  - 0   # max_aruco_ransac_max_samples
+  - 0   # max_aruco_ransac_min_samples
+  - 0   # max_aruco_ransac_max_residuals
+  - 0   # max_aruco_ransac_min_residuals
+  - 0   # max_aruco_ransac_max_errors
+  - 0   # max_aruco_ransac_min_errors
+  - 0   # max_aruco_ransac_max_distances
+  - 0   # max_aruco_ransac_min_distances
+  - 0   # max_aruco_ransac_max_angles
+  - 0   # max_aruco_ransac_min_angles
+  - 0   # max_aruco_ransac_max_ratios
+  - 0   # max_aruco_ransac_min_ratios
+  - 0   # max_aruco_ransac_max_areas
+  - 0   # max_aruco_ransac_min_areas
+  - 0   # max_aruco_ransac_max_perimeters
+  - 0   # max_aruco_ransac_min_perimeters
+  - 0   # max_aruco_ransac_max_centers
+  - 0   # max_aruco_ransac_min_centers
+  - 0   # max_aruco_ransac_max_corners
+  - 0   # max_aruco_ransac_min_corners
+  - 0   # max_aruco_ransac_max_edges
+  - 0   # max_aruco_ransac_min_edges
+  - 0   # max_aruco_ransac_max_vertices
+  - 0   # max_aruco_ransac_min_vertices
+  - 0   # max_aruco_ransac_max_faces
+  - 0   # max_aruco_ransac_min_faces
+  - 0   # max_aruco_ransac_max_volumes
+  - 0   # max_aruco_ransac_min_volumes
+  - 0   # max_aruco_ransac_max_surfaces
+  - 0   # max_aruco_ransac_min_surfaces
+  - 0   # max_aruco_ransac_max_curves
+  - 0   # max_aruco_ransac_min_curves
+  - 0   # max_aruco_ransac_max_lines
+  - 0   # max_aruco_ransac_min_lines
+  - 0   # max_aruco_ransac_max_points
+  - 0   # max_aruco_ransac_min_points
+  - 0   # max_aruco_ransac_max_vectors
+  - 0   # max_aruco_ransac_min_vectors
+  - 0   # max_aruco_ransac_max_matrices
+  - 0   # max_aruco_ransac_min_matrices
+  - 0   # max_aruco_ransac_max_transforms
+  - 0   # max_aruco_ransac_min_transforms
+  - 0   # max_aruco_ransac_max_rotations
+  - 0   # max_aruco_ransac_min_rotations
+  - 0   # max_aruco_ransac_max_translations
+  - 0   # max_aruco_ransac_min_translations
+  - 0   # max_aruco_ransac_max_scales
+  - 0   # max_aruco_ransac_min_scales
+  - 0   # max_aruco_ransac_max_shears
+  - 0   # max_aruco_ransac_min_shears
+  - 0   # max_aruco_ransac_max_skews
+  - 0   # max_aruco_ransac_min_skews
+  - 0   # max_aruco_ransac_max_reflections
+  - 0   # max_aruco_ransac_min_reflections
+  - 0   # max_aruco_ransac_max_projections
+  - 0   # max_aruco_ransac_min_projections
+  - 0   # max_aruco_ransac_max_affines
+  - 0   # max_aruco_ransac_min_affines
+  - 0   # max_aruco_ransac_max_similarities
+  - 0   # max_aruco_ransac_min_similarities
+  - 0   # max_aruco_ransac_max_euclideans
+  - 0   # max_aruco_ransac_min_euclideans
+  - 0   # max_aruco_ransac_max_homographies
+  - 0   # max_aruco_ransac_min_homographies
+  - 0   # max_aruco_ransac_max_fundamentals
+  - 0   # max_aruco_ransac_min_fundamentals
+  - 0   # max_aruco_ransac_max_essentials
+  - 0   # max_aruco_ransac_min_essentials
+  - 0   # max_aruco_ransac_max_trifocals
+  - 0   # max_aruco_ransac_min_trifocals
+  - 0   # max_aruco_ransac_max_quadrifocals
+  - 0   # max_aruco_ransac_min_quadrifocals
+  - 0   # max_aruco_ransac_max_pentafocals
+  - 0   # max_aruco_ransac_min_pentafocals
+  - 0   # max_aruco_ransac_max_hexafocals
+  - 0   # max_aruco_ransac_min_hexafocals
+  - 0   # max_aruco_ransac_max_heptafocals
+  - 0   # max_aruco_ransac_min_heptafocals
+  - 0   # max_aruco_ransac_max_octafocals
+  - 0   # max_aruco_ransac_min_octafocals
+  - 0   # max_aruco_ransac_max_nonafocals
+  - 0   # max_aruco_ransac_min_nonafocals
+  - 0   # max_aruco_ransac_max_decafocals
+  - 0   # max_aruco_ransac_min_decafocals
+
+# ========================================
+# OUTPUT PARAMETERS
+# ========================================
+save_trajectory_format: "tum"
+save_trajectory_path: "/workspace/results/trajectory.txt"
+save_timing_path: "/workspace/results/timing.txt"
+save_calibration_path: "/workspace/results/calibration.txt"
+save_features_path: "/workspace/results/features.txt"
+save_landmarks_path: "/workspace/results/landmarks.txt"

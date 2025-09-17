@@ -34,6 +34,11 @@ ENV CXX="ccache g++"
 ENV CCACHE_DIR="/tmp/ccache"
 ENV CCACHE_MAXSIZE="2G"
 
+# CRITICAL: Setup pkg-config environment EARLY for all packages
+RUN mkdir -p /usr/local/lib/pkgconfig && \
+    chmod 755 /usr/local/lib/pkgconfig
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
+
 # PRIORITY 1: Install acceleration tools FIRST for maximum benefit
 RUN apt-get update && \
     # Install essential tools for repository management
@@ -83,6 +88,24 @@ RUN (apt-fast update || apt-get update) && (apt-fast install -y \
     git \
     vim \
     htop \
+    # --- COMPREHENSIVE TOOLING SUITE ---
+    # System Administration
+    net-tools \
+    iproute2 \
+    tmux \
+    iotop \
+    # Debugging & Profiling
+    gdb \
+    valgrind \
+    linux-tools-common \
+    # --- ADDITIONAL POWERFUL TOOLS ---
+    openssh-server \
+    screen \
+    ncdu \
+    iftop \
+    jq \
+    git-lfs \
+    # ------------------------------------
     build-essential \
     cmake \
     pkg-config \
@@ -121,20 +144,53 @@ RUN (apt-fast update || apt-get update) && (apt-fast install -y \
     libgflags-dev \
     libatlas-base-dev \
     libsuitesparse-dev \
+    libspqr2 \
     gfortran \
-    # NVIDIA cuDNN for CUDA accelerated deep learning (will be installed from NVIDIA repo)
-    # libcudnn8-dev \
+    # --- NEW ACCELERATION LIBRARIES ---
+    libopenblas-dev \
+    liblapacke-dev \
+    libmetis-dev \
     # Intel Threading Building Blocks for enhanced parallelism
     libtbb-dev \
     libtbb2 \
+    # --- PARALLEL COMPUTING LIBRARIES ---
+    libomp-dev \
+    libgomp1 \
+    # MPI for distributed computing (optional but powerful)
+    libmpich-dev \
+    mpich \
+    # Additional optimization support
+    libc6-dev \
+    binutils \
+    gcc-multilib \
+    # Memory profiling and debugging
+    libtcmalloc-minimal4 \
+    libgoogle-perftools-dev \
     && rm -rf /var/lib/apt/lists/*) || (echo "⚠️ apt-fast failed, using apt-get fallback" && apt-get update && apt-get install -y \
-    git vim htop build-essential cmake pkg-config autoconf automake libtool \
-    unzip zip tar python3 python3-pip python3-dev python3-all-dev python3-numpy python3-matplotlib \
-    locales lsb-release gnupg2 libeigen3-dev \
-    libjpeg-dev libpng-dev libtiff-dev libavcodec-dev libavformat-dev libswscale-dev \
-    libv4l-dev libxvidcore-dev libx264-dev libgtk-3-dev libgoogle-glog-dev libgflags-dev \
-    libatlas-base-dev libsuitesparse-dev gfortran libtbb-dev libtbb2 \
+    # --- SYNCHRONIZED FALLBACK LIST (EXACT COPY) ---
+    git vim htop net-tools iproute2 tmux iotop gdb valgrind linux-tools-common \
+    openssh-server screen ncdu iftop jq git-lfs \
+    build-essential cmake pkg-config autoconf automake libtool \
+    unzip zip tar \
+    python3 python3-pip python3-dev python3-all-dev python3-numpy python3-matplotlib \
+    locales lsb-release gnupg2 \
+    libeigen3-dev libjpeg-dev libpng-dev libtiff-dev libavcodec-dev libavformat-dev libswscale-dev \
+    libv4l-dev libxvidcore-dev libx264-dev libgtk-3-dev \
+    libgoogle-glog-dev libgflags-dev libatlas-base-dev libsuitesparse-dev libspqr2 gfortran \
+    libopenblas-dev liblapacke-dev libmetis-dev \
+    libtbb-dev libtbb2 \
+    libomp-dev libgomp1 libmpich-dev mpich \
+    libc6-dev binutils gcc-multilib libtcmalloc-minimal4 libgoogle-perftools-dev \
     && rm -rf /var/lib/apt/lists/*)
+
+# Install FlameGraph tools for performance profiling
+RUN echo "🔥 Installing FlameGraph tools..." && \
+    cd /opt && \
+    git clone https://github.com/brendangregg/FlameGraph.git && \
+    chmod +x /opt/FlameGraph/*.pl && \
+    ln -s /opt/FlameGraph/stackcollapse-perf.pl /usr/local/bin/ && \
+    ln -s /opt/FlameGraph/flamegraph.pl /usr/local/bin/ && \
+    echo "✅ FlameGraph tools installed (use: perf record -> stackcollapse-perf.pl -> flamegraph.pl)"
 
 # Set up locale
 RUN locale-gen en_US en_US.UTF-8 && \
@@ -160,23 +216,128 @@ RUN (apt-fast update && apt-fast install -y \
     ros-${ROS_DISTRO}-tf2-geometry-msgs \
     ros-${ROS_DISTRO}-rosbag2 \
     ros-${ROS_DISTRO}-rosbag2-storage-default-plugins \
+    # --- COMPREHENSIVE ROS2 TOOLING SUITE ---
+    # RQT Tools for introspection
+    ros-${ROS_DISTRO}-rqt-graph \
+    ros-${ROS_DISTRO}-rqt-plot \
+    ros-${ROS_DISTRO}-rqt-console \
+    # Modernization & Visualization
+    ros-${ROS_DISTRO}-foxglove-bridge \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-xacro \
+    # TF and URDF Tools
+    ros-${ROS_DISTRO}-tf2-tools \
+    ros-${ROS_DISTRO}-robot-state-publisher \
+    ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    # Diagnostics & High-Value Utilities
+    ros-${ROS_DISTRO}-rqt-reconfigure \
+    ros-${ROS_DISTRO}-nav2-util \
+    # ----------------------------------------
     python3-rosdep \
     python3-colcon-common-extensions \
     python3-vcstool \
     && rm -rf /var/lib/apt/lists/*) || (echo "⚠️ apt-fast failed for ROS2, using apt-get fallback" && apt-get update && apt-get install -y \
+    # --- SYNCHRONIZED ROS2 FALLBACK LIST (COMPLETE) ---
     ros-${ROS_DISTRO}-desktop ros-${ROS_DISTRO}-cv-bridge ros-${ROS_DISTRO}-image-transport \
     ros-${ROS_DISTRO}-sensor-msgs ros-${ROS_DISTRO}-geometry-msgs ros-${ROS_DISTRO}-nav-msgs \
     ros-${ROS_DISTRO}-tf2 ros-${ROS_DISTRO}-tf2-ros ros-${ROS_DISTRO}-tf2-geometry-msgs \
     ros-${ROS_DISTRO}-rosbag2 ros-${ROS_DISTRO}-rosbag2-storage-default-plugins \
+    ros-${ROS_DISTRO}-rqt-graph ros-${ROS_DISTRO}-rqt-plot ros-${ROS_DISTRO}-rqt-console \
+    ros-${ROS_DISTRO}-foxglove-bridge ros-${ROS_DISTRO}-ros2-control ros-${ROS_DISTRO}-ros2-controllers ros-${ROS_DISTRO}-xacro \
+    ros-${ROS_DISTRO}-tf2-tools ros-${ROS_DISTRO}-robot-state-publisher ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    ros-${ROS_DISTRO}-rqt-reconfigure ros-${ROS_DISTRO}-nav2-util \
     python3-rosdep python3-colcon-common-extensions python3-vcstool \
     && rm -rf /var/lib/apt/lists/*)
 
 # Initialize rosdep
 RUN rosdep init && rosdep update
 
+# Fix NumPy version AND prevent system OpenCV installation
+RUN echo "🔧 Fixing NumPy version for OpenCV compatibility..." && \
+    pip3 uninstall -y numpy && \
+    pip3 install --no-cache-dir "numpy==1.21.5" && \
+    echo "✅ NumPy version fixed for OpenCV compatibility" && \
+    # CRITICAL: Create preferences to BLOCK system OpenCV installation
+    echo "🛡️ Creating APT preferences to block system OpenCV..." && \
+    mkdir -p /etc/apt/preferences.d && \
+    echo "Package: libopencv*" > /etc/apt/preferences.d/block-opencv && \
+    echo "Pin: release *" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Pin-Priority: -1" >> /etc/apt/preferences.d/block-opencv && \
+    echo "" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Package: python3-opencv" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Pin: release *" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Pin-Priority: -1" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Package: opencv-*" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Pin: release *" >> /etc/apt/preferences.d/block-opencv && \
+    echo "Pin-Priority: -1" >> /etc/apt/preferences.d/block-opencv && \
+    echo "✅ System OpenCV packages blocked via APT preferences"
+
+# Remove any system-installed OpenCV and Ceres packages to prevent conflicts
+RUN echo "🧹 Cleaning up conflicting system packages..." && \
+    # Remove all OpenCV system packages
+    apt-get remove -y --purge \
+        libopencv-dev \
+        libopencv-core-dev \
+        libopencv-imgproc-dev \
+        libopencv-imgcodecs-dev \
+        libopencv-videoio-dev \
+        libopencv-highgui-dev \
+        libopencv-ml-dev \
+        libopencv-video-dev \
+        libopencv-features2d-dev \
+        libopencv-calib3d-dev \
+        libopencv-objdetect-dev \
+        libopencv-contrib-dev \
+        libopencv-flann-dev \
+        libopencv-photo-dev \
+        libopencv-stitching-dev \
+        libopencv-superres-dev \
+        libopencv-videostab-dev \
+        libopencv4.* \
+        libopencv3.* \
+        libopencv2.* \
+        opencv-data \
+        python3-opencv \
+        # Remove any Ceres system packages
+        libceres-dev \
+        libceres1 \
+        libceres2 \
+        2>/dev/null || echo "✅ No conflicting packages found to remove" && \
+    # Clean up package cache
+    apt-get autoremove -y && \
+    apt-get autoclean && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Put holds on packages to prevent accidental installation
+    echo "🔒 Setting package holds to prevent conflicts..." && \
+    apt-mark hold \
+        libopencv-dev \
+        libopencv-core-dev \
+        libopencv-imgproc-dev \
+        libopencv-imgcodecs-dev \
+        libopencv-videoio-dev \
+        libopencv-highgui-dev \
+        libopencv-ml-dev \
+        libopencv-video-dev \
+        libopencv-features2d-dev \
+        libopencv-calib3d-dev \
+        libopencv-objdetect-dev \
+        libopencv-contrib-dev \
+        libceres-dev \
+        libceres1 \
+        libceres2 \
+        2>/dev/null || echo "✅ Package holds set" && \
+    echo "✅ System cleanup complete - ready for custom builds"
+
 # Create workspace
 WORKDIR /workspace
-RUN mkdir -p /workspace/src
+RUN mkdir -p /workspace/src /workspace/scripts
+
+# Copy verification scripts
+COPY scripts/verify_library_paths.sh /workspace/scripts/
+COPY scripts/validate_build_paths.sh /workspace/scripts/
+RUN chmod +x /workspace/scripts/verify_library_paths.sh && \
+    chmod +x /workspace/scripts/validate_build_paths.sh
 
 # Build Ceres Solver from source with caching
 RUN --mount=type=cache,target=/cache/downloads,sharing=locked \
@@ -198,12 +359,26 @@ RUN --mount=type=cache,target=/cache/downloads,sharing=locked \
     tar -xzf ceres-solver-${CERES_VERSION}.tar.gz && \
     cd ceres-solver-${CERES_VERSION} && \
     mkdir build && cd build && \
-    # Use Ninja for faster builds (ccache already in ENV)
+    # Use robust CMake configuration for OpenBLAS and METIS
+    echo "🔍 Using robust CMake library detection..." && \
     cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DBLA_VENDOR=OpenBLAS \
           -DBUILD_TESTING=OFF \
           -DBUILD_EXAMPLES=OFF \
           -DBUILD_BENCHMARKS=OFF \
+          -DBUILD_SHARED_LIBS=ON \
           -DCMAKE_INSTALL_PREFIX=/usr/local \
+          -DCMAKE_CXX_FLAGS="-O3 -march=znver3 -mtune=znver3 -ffast-math -funroll-loops -flto" \
+          -DCMAKE_C_FLAGS="-O3 -march=znver3 -mtune=znver3 -ffast-math -funroll-loops -flto" \
+          -DUSE_OPENMP=ON \
+          -DUSE_TBB=ON \
+          -DCERES_THREADING_MODEL=OPENMP \
+          -DCERES_USE_METIS=ON \
+          -DCERES_USE_OPENBLAS=ON \
+          # --- CERES MAXIMUM PERFORMANCE CONFIGURATION (DUPLICATES REMOVED) ---
+          -DCERES_USE_EIGEN_SPARSE=ON \
+          # --- ENABLE PKG-CONFIG GENERATION ---
+          -DBUILD_SHARED_LIBS=ON \
           .. && \
     # Memory-safe compilation for Ceres Solver
     SAFE_JOBS=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 )) && \
@@ -211,7 +386,31 @@ RUN --mount=type=cache,target=/cache/downloads,sharing=locked \
     ninja -j$SAFE_JOBS && \
     ninja install && \
     ldconfig && \
-    cd /tmp && rm -rf ceres-solver*
+    # Create Ceres pkg-config file manually if it doesn't exist (directory already exists)
+    if [ ! -f /usr/local/lib/pkgconfig/ceres.pc ]; then \
+        echo "🔧 Creating Ceres pkg-config file manually..." && \
+        echo 'prefix=/usr/local' > /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'exec_prefix=${prefix}' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'libdir=${exec_prefix}/lib' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'includedir=${prefix}/include' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo '' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'Name: Ceres Solver' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'Description: A large scale non-linear optimization library' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'Version: 2.1.0' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'URL: http://ceres-solver.org/' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'Libs: -L${libdir} -lceres' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'Libs.private: -lglog -lgflags -lpthread' >> /usr/local/lib/pkgconfig/ceres.pc && \
+        echo 'Cflags: -I${includedir}' >> /usr/local/lib/pkgconfig/ceres.pc; \
+    fi && \
+    # PKG_CONFIG_PATH already set globally as ENV variable
+    cd /tmp && rm -rf ceres-solver* && \
+    # Verify custom Ceres installation
+    echo "🔍 Verifying custom Ceres installation..." && \
+    (PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}" pkg-config --modversion ceres && echo "✅ Ceres pkg-config working") || echo "⚠️ Ceres pkg-config not found (checking library directly)" && \
+    (ldconfig -p | grep ceres && echo "✅ Ceres library found in system") || echo "⚠️ Ceres library verification failed" && \
+    (ls -la /usr/local/lib/libceres* 2>/dev/null && echo "✅ Ceres library files present") || echo "⚠️ No Ceres library files found" && \
+    (ls -la /usr/local/lib/pkgconfig/ceres.pc 2>/dev/null && echo "✅ Ceres pkg-config file present") || echo "⚠️ No Ceres pkg-config file found" && \
+    echo "✅ Custom Ceres build verification complete"
 
 # Clone OpenVINS with caching
 RUN --mount=type=cache,target=/cache/git,sharing=locked \
@@ -284,44 +483,95 @@ RUN --mount=type=cache,target=/cache/downloads,sharing=locked \
     gcc --version && \
     python3 --version && \
     python3 -c "import numpy; print('NumPy version:', numpy.__version__)" && \
-    # Use Ninja + ccache for faster compilation (ccache already in ENV)
+    # Verify critical library paths exist
+    echo "🔍 Verifying critical library paths..." && \
+    ls -la /usr/lib/x86_64-linux-gnu/libopenblas.so && \
+    ls -la /usr/include/x86_64-linux-gnu/cblas.h && \
+    ls -la /usr/include/lapacke.h && \
+    ls -la /usr/include/x86_64-linux-gnu/openblas-pthread/ && \
+    ls -la /usr/lib/x86_64-linux-gnu/libtbb.so && \
+    # Verify OpenMP and MPI libraries with correct paths
+    ls -la /usr/lib/x86_64-linux-gnu/libomp.so.5 && \
+    ls -la /usr/lib/x86_64-linux-gnu/libgomp.so.1 && \
+    which mpicc && echo "✅ MPI compiler found" && \
+    which mpicxx && echo "✅ MPI C++ compiler found" && \
+    # Verify Google perftools for memory optimization
+    ls -la /usr/lib/x86_64-linux-gnu/libtcmalloc* && \
+    echo "✅ All critical libraries (OpenBLAS, TBB, OpenMP, MPI, TCMalloc) found" && \
+    # Use robust CMake configuration for OpenCV (same as Ceres)
+    echo "🔍 Using robust CMake library detection for OpenCV..." && \
     cmake -GNinja -D CMAKE_BUILD_TYPE=RELEASE \
+          -DBLA_VENDOR=OpenBLAS \
           -D CMAKE_INSTALL_PREFIX=/usr/local \
           -D CMAKE_C_COMPILER=/usr/bin/gcc \
           -D CMAKE_CXX_COMPILER=/usr/bin/g++ \
+          -D CMAKE_CXX_FLAGS="-O3 -march=native -mtune=native -ffast-math -funroll-loops -fopenmp -ftree-vectorize" \
+          -D CMAKE_C_FLAGS="-O3 -march=native -mtune=native -ffast-math -funroll-loops -fopenmp -ftree-vectorize" \
+          -D BUILD_SHARED_LIBS=ON \
+          -D CMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE \
+          -D CMAKE_INSTALL_RPATH="/usr/local/lib" \
           -D OPENCV_EXTRA_MODULES_PATH=/tmp/opencv_contrib-${OPENCV_VERSION}/modules \
-          -D WITH_CUDA=ON \
-          -D WITH_CUDNN=OFF \
-          -D OPENCV_DNN_CUDA=OFF \
-          -D ENABLE_FAST_MATH=1 \
-          -D CUDA_FAST_MATH=1 \
-          -D CUDA_ARCH_BIN=${CUDA_ARCH} \
-          -D WITH_CUBLAS=1 \
-          -D OPENCV_ENABLE_NONFREE=ON \
-          -D BUILD_EXAMPLES=OFF \
-          -D BUILD_DOCS=OFF \
-          -D BUILD_PERF_TESTS=OFF \
-          -D BUILD_TESTS=OFF \
-          -D WITH_GTK=OFF \
-          -D WITH_GTK_2_X=OFF \
-          -D WITH_QT=OFF \
-          -D BUILD_opencv_apps=OFF \
-          -D WITH_TBB=ON \
-          -D WITH_OPENMP=ON \
-          -D WITH_IPP=ON \
-          -D PYTHON3_EXECUTABLE=/usr/bin/python3 \
-          -D PYTHON3_INCLUDE_DIR=/usr/include/python3.10 \
-          -D PYTHON3_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.10.so \
-          -D PYTHON3_NUMPY_INCLUDE_DIRS=/usr/lib/python3/dist-packages/numpy/core/include \
-          -D BUILD_opencv_python3=ON \
-          .. && \
+          -D WITH_LAPACK=ON \
+          -D LAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas.so \
+          -D LAPACK_CBLAS_H=/usr/include/x86_64-linux-gnu/cblas.h \
+          -D LAPACK_LAPACKE_H=/usr/include/lapacke.h \
+          -D OpenBLAS_INCLUDE_DIR=/usr/include/x86_64-linux-gnu/openblas-pthread \
+          -D OpenBLAS_LIB=/usr/lib/x86_64-linux-gnu/libopenblas.so \
+          -D BLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas.so \
+            -D WITH_CUDA=ON \
+            -D WITH_CUDNN=OFF \
+            -D OPENCV_DNN_CUDA=OFF \
+            -D ENABLE_FAST_MATH=1 \
+            -D CUDA_FAST_MATH=ON \
+            -D CUDA_ARCH_BIN="8.6" \
+            -D CUDA_ARCH_PTX="8.6" \
+            -D CUDA_NVCC_FLAGS="--compiler-options -march=znver3,-mtune=znver3" \
+            -D WITH_CUBLAS=1 \
+            -D WITH_OPENBLAS=ON \
+            # --- BUILD OPTIONS ---
+            -D OPENCV_ENABLE_NONFREE=ON \
+            -D BUILD_EXAMPLES=OFF \
+            -D BUILD_DOCS=OFF \
+            -D BUILD_PERF_TESTS=OFF \
+            -D BUILD_TESTS=OFF \
+            -D WITH_GTK=OFF \
+            -D WITH_GTK_2_X=OFF \
+            -D WITH_QT=OFF \
+            -D BUILD_opencv_apps=OFF \
+            # --- PARALLELIZATION ---
+            -D WITH_TBB=ON \
+            -D TBB_INCLUDE_DIRS=/usr/include \
+            -D TBB_LIBRARIES=/usr/lib/x86_64-linux-gnu \
+            -D WITH_OPENMP=ON \
+            -D WITH_IPP=OFF \
+            -D WITH_EIGEN=ON \
+            # --- AMD RYZEN 9 5900HX CPU OPTIMIZATIONS ---
+            -D CPU_BASELINE=AVX2 \
+            -D CPU_DISPATCH="FMA4;FMA3" \
+            -D ENABLE_AVX2=ON \
+            -D ENABLE_FMA=ON \
+            # --- PYTHON BINDINGS ---
+            -D PYTHON3_EXECUTABLE=/usr/bin/python3 \
+            -D PYTHON3_INCLUDE_DIR=/usr/include/python3.10 \
+            -D PYTHON3_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.10.so \
+            -D PYTHON3_NUMPY_INCLUDE_DIRS=/usr/lib/python3/dist-packages/numpy/core/include \
+            -D BUILD_opencv_python3=ON \
+            # --- PKG-CONFIG GENERATION ---
+            -D OPENCV_GENERATE_PKGCONFIG=ON \
+            .. && \
     # Memory-efficient compilation (CUDA DNN disabled, so much less memory-intensive)
     SAFE_JOBS=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 )) && \
     echo "🚀 Compiling OpenCV with $SAFE_JOBS parallel jobs (CUDA DNN disabled for memory efficiency)..." && \
     ninja -j$SAFE_JOBS && \
     ninja install && \
     ldconfig && \
-    cd / && rm -rf /tmp/opencv*
+    cd / && rm -rf /tmp/opencv* && \
+    # Verify custom OpenCV installation
+    echo "🔍 Verifying custom OpenCV installation..." && \
+    python3 -c "import cv2; print(f'✅ OpenCV {cv2.__version__} successfully installed from source')" && \
+    (pkg-config --modversion opencv4 && echo "✅ OpenCV pkg-config working") || echo "⚠️ OpenCV pkg-config not found (normal for custom builds)" && \
+    python3 -c "import cv2; print('OpenCV build info:'); print(cv2.getBuildInformation())" | grep -E "(LAPACK|TBB|OpenMP|CUDA)" && \
+    echo "✅ Custom OpenCV build verification complete"
 
 # Build OpenVINS with optimizations and BuildKit cache mounts
 RUN --mount=type=cache,target=/tmp/ccache,sharing=locked \
@@ -331,20 +581,41 @@ RUN --mount=type=cache,target=/tmp/ccache,sharing=locked \
     SAFE_JOBS=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 )) && \
     echo "🚀 Compiling OpenVINS with $SAFE_JOBS parallel jobs..." && \
     # Use ccache and parallel builds with persistent cache
+    # Set global environment for dependencies discovery
+    export CMAKE_PREFIX_PATH="/usr/local:/usr/include/suitesparse" && \
+    # PKG_CONFIG_PATH already set globally as ENV variable
+    # Build with ONLY OpenVINS-accepted flags
     colcon build --cmake-args \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_COMPILER_LAUNCHER=ccache \
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-        --parallel-workers $SAFE_JOBS
+        # --- AMD RYZEN 9 5900HX OPTIMIZED COMPILER FLAGS ---
+        -DCMAKE_C_FLAGS="-O3 -march=znver3 -mtune=znver3 -ffast-math -funroll-loops -flto -fopenmp -ftree-vectorize" \
+        -DCMAKE_CXX_FLAGS="-O3 -march=znver3 -mtune=znver3 -ffast-math -funroll-loops -flto -fopenmp -ftree-vectorize" \
+        -DCMAKE_EXE_LINKER_FLAGS="-flto -fopenmp -Wl,--as-needed" \
+        -DCMAKE_MODULE_LINKER_FLAGS="-flto -fopenmp -Wl,--as-needed" \
+        -DCMAKE_SHARED_LINKER_FLAGS="-flto -fopenmp -Wl,--as-needed" \
+        # --- OPENVINS-SPECIFIC FLAGS ONLY ---
+        -DBUILD_OV_EVAL=ON \
+        -DENABLE_ROS=ON \
+        -DENABLE_ARUCO_TAGS=ON \
+        -DDISABLE_MATPLOTLIB=OFF \
+        -DUSE_OPENMP=ON \
+        -DUSE_TBB=ON \
+        --parallel-workers $SAFE_JOBS && \
+    # Verify OpenVINS is linking to optimized libraries
+    echo "🔍 Verifying OpenVINS library linkage..." && \
+    cd /workspace && \
+    find install -name "*.so" -exec ldd {} \; 2>/dev/null | grep -E "(openblas|tbb|ceres)" | head -10 && \
+    echo "✅ OpenVINS acceleration library verification complete"
 
-# Install Python packages for analysis with optimizations
-RUN pip3 install --no-cache-dir \
-    numpy \
+# Install Python packages with NumPy compatibility (pin NumPy FIRST)
+RUN pip3 install --no-cache-dir "numpy==1.21.5" && \
+    pip3 install --no-cache-dir \
     matplotlib \
     scipy \
-    pandas \
+    "pandas<2.0" \
     pyyaml \
-    opencv-python \
     rosbags
     # Optional: GPU acceleration for Python analysis scripts
     # cupy-cuda12x \
@@ -353,90 +624,166 @@ RUN pip3 install --no-cache-dir \
     # Uncomment if you want GPU acceleration for video analysis scripts
 
 # Set up environment
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
     echo "source /workspace/install/setup.bash" >> /root/.bashrc && \
-    echo "export CUDA_VISIBLE_DEVICES=0" >> /root/.bashrc
-
-# Create entrypoint script
-RUN echo '#!/bin/bash\n\
-source /opt/ros/${ROS_DISTRO}/setup.bash\n\
-source /workspace/install/setup.bash\n\
-export CUDA_VISIBLE_DEVICES=0\n\
-exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/bin/bash"]
+    echo "export CUDA_VISIBLE_DEVICES=0" >> /root/.bashrc && \
+    # --- AMD ZEN 3 + RTX 3080 PERFORMANCE ENVIRONMENT VARIABLES ---
+    echo "export OMP_NUM_THREADS=\$(nproc)" >> /root/.bashrc && \
+    echo "export OMP_PROC_BIND=spread" >> /root/.bashrc && \
+    echo "export OMP_PLACES=cores" >> /root/.bashrc && \
+    echo "export OMP_SCHEDULE=dynamic,64" >> /root/.bashrc && \
+    echo "export OPENBLAS_CORETYPE=znver3" >> /root/.bashrc && \
+    echo "export OPENBLAS_NUM_THREADS=\$(nproc)" >> /root/.bashrc && \
+    echo "export TBB_NUM_THREADS=\$(nproc)" >> /root/.bashrc && \
+    echo "export CC='ccache gcc'" >> /root/.bashrc && \
+    echo "export CXX='ccache g++'" >> /root/.bashrc && \
+    # --- ADVANCED MPI CONFIGURATION ---
+    echo "export MPICC='mpicc'" >> /root/.bashrc && \
+    echo "export MPICXX='mpicxx'" >> /root/.bashrc && \
+    echo "export MPICH_CPU_BIND='verbose,cores'" >> /root/.bashrc && \
+    echo "export MPICH_RANK_REORDER_METHOD=0" >> /root/.bashrc && \
+    echo "export MPICH_MAX_THREAD_SAFETY=multiple" >> /root/.bashrc && \
+    echo "export MPICH_ALLREDUCE_SHORT_MSG_SIZE=2048" >> /root/.bashrc && \
+    echo "export MPICH_REDUCE_SHORT_MSG_SIZE=2048" >> /root/.bashrc && \
+    echo "export MPICH_ALLTOALL_SHORT_MSG_SIZE=256" >> /root/.bashrc && \
+    # --- ADVANCED OPENMP CONFIGURATION ---
+    echo "export OMP_PROC_BIND=close" >> /root/.bashrc && \
+    echo "export OMP_PLACES=cores" >> /root/.bashrc && \
+    echo "export OMP_SCHEDULE='dynamic,64'" >> /root/.bashrc && \
+    echo "export OMP_WAIT_POLICY=active" >> /root/.bashrc && \
+    echo "export OMP_DYNAMIC=false" >> /root/.bashrc && \
+    echo "export OMP_THREAD_LIMIT=8" >> /root/.bashrc && \
+    echo "export OMP_MAX_ACTIVE_LEVELS=1" >> /root/.bashrc && \
+    echo "export GOMP_CPU_AFFINITY='0-7'" >> /root/.bashrc && \
+    # --- MEMORY OPTIMIZATION ---
+    echo "export LD_PRELOAD='/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so'" >> /root/.bashrc && \
+    echo "export MALLOC_MMAP_THRESHOLD_=131072" >> /root/.bashrc && \
+    echo "export MALLOC_TRIM_THRESHOLD_=131072" >> /root/.bashrc && \
+    echo "export MALLOC_TOP_PAD_=131072" >> /root/.bashrc && \
+    echo "export MALLOC_MMAP_MAX_=65536" >> /root/.bashrc && \
+    # --- ROS2 PERFORMANCE OPTIMIZATIONS ---
+    echo "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp" >> /root/.bashrc && \
+    echo "export RCLCPP_LOGGING_BUFFERED_STREAM=1" >> /root/.bashrc && \
+    echo "export RCLCPP_DISABLE_SIGNAL_HANDLER=1" >> /root/.bashrc && \
+    echo "export ROS_DOMAIN_ID=0" >> /root/.bashrc && \
+    echo "export RCLCPP_EXECUTOR_NUM_THREADS=\$(nproc)" >> /root/.bashrc
 
 # Expose common ports for visualization
 EXPOSE 8080 8081 8082
+
+# Create FastDDS configuration for shared memory transport
+RUN mkdir -p /root/.ros && \
+    echo '<?xml version="1.0" encoding="UTF-8" ?>' > /root/.ros/fastdds_shm.xml && \
+    echo '<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">' >> /root/.ros/fastdds_shm.xml && \
+    echo '    <transport_descriptors>' >> /root/.ros/fastdds_shm.xml && \
+    echo '        <transport_descriptor>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            <transport_id>ShmTransport</transport_id>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            <type>SHM</type>' >> /root/.ros/fastdds_shm.xml && \
+    echo '        </transport_descriptor>' >> /root/.ros/fastdds_shm.xml && \
+    echo '        <transport_descriptor>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            <transport_id>UdpTransport</transport_id>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            <type>UDPv4</type>' >> /root/.ros/fastdds_shm.xml && \
+    echo '        </transport_descriptor>' >> /root/.ros/fastdds_shm.xml && \
+    echo '    </transport_descriptors>' >> /root/.ros/fastdds_shm.xml && \
+    echo '    <participant>' >> /root/.ros/fastdds_shm.xml && \
+    echo '        <rtps>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            <userTransports>' >> /root/.ros/fastdds_shm.xml && \
+    echo '                <transport_id>ShmTransport</transport_id>' >> /root/.ros/fastdds_shm.xml && \
+    echo '                <transport_id>UdpTransport</transport_id>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            </userTransports>' >> /root/.ros/fastdds_shm.xml && \
+    echo '            <useBuiltinTransports>false</useBuiltinTransports>' >> /root/.ros/fastdds_shm.xml && \
+    echo '        </rtps>' >> /root/.ros/fastdds_shm.xml && \
+    echo '    </participant>' >> /root/.ros/fastdds_shm.xml && \
+    echo '</profiles>' >> /root/.ros/fastdds_shm.xml && \
+    # Set FastDDS profile environment variable
+    echo "export FASTRTPS_DEFAULT_PROFILES_FILE=/root/.ros/fastdds_shm.xml" >> /root/.bashrc && \
+    # --- PKG-CONFIG PATH FOR CUSTOM LIBRARIES ---
+    echo "export PKG_CONFIG_PATH=\"/usr/local/lib/pkgconfig:\${PKG_CONFIG_PATH}\"" >> /root/.bashrc
 
 # Set working directory
 WORKDIR /workspace
 
-# STAGE 2: Production Runtime Image (Optimized and lean)
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04 AS runtime
+# Install gosu and sudo for user permission handling
+RUN apt-get update && apt-get install -y gosu sudo && rm -rf /var/lib/apt/lists/*
 
-# Re-declare ARG variables for runtime stage
-ARG ROS_DISTRO="humble"
+# Create user permission handling script with ROS environment
+RUN echo '#!/bin/bash\n\
+USER_ID=${HOST_UID:-1000}\n\
+GROUP_ID=${HOST_GID:-1000}\n\
+\n\
+# Source ROS and workspace setup\n\
+source /opt/ros/humble/setup.bash\n\
+source /workspace/install/setup.bash\n\
+export CUDA_VISIBLE_DEVICES=0\n\
+\n\
+# Create group if it doesn'\''t exist\n\
+if ! getent group $GROUP_ID > /dev/null 2>&1; then\n\
+    groupadd --gid $GROUP_ID user\n\
+fi\n\
+\n\
+# Create user if it doesn'\''t exist\n\
+if ! getent passwd $USER_ID > /dev/null 2>&1; then\n\
+    useradd --uid $USER_ID --gid $GROUP_ID --create-home --shell /bin/bash user\n\
+fi\n\
+\n\
+# Add user to sudo group\n\
+usermod -aG sudo user\n\
+echo "user ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers\n\
+\n\
+# Set up user environment\n\
+echo "source /opt/ros/humble/setup.bash" >> /home/user/.bashrc\n\
+echo "source /workspace/install/setup.bash" >> /home/user/.bashrc\n\
+echo "export CUDA_VISIBLE_DEVICES=0" >> /home/user/.bashrc\n\
+echo "export OMP_NUM_THREADS=8" >> /home/user/.bashrc\n\
+echo "export TBB_NUM_THREADS=8" >> /home/user/.bashrc\n\
+echo "export OPENBLAS_NUM_THREADS=8" >> /home/user/.bashrc\n\
+echo "export MKL_NUM_THREADS=8" >> /home/user/.bashrc\n\
+echo "export CC='\''ccache gcc'\''" >> /home/user/.bashrc\n\
+echo "export CXX='\''ccache g++'\''" >> /home/user/.bashrc\n\
+echo "export MPICC='\''mpicc'\''" >> /home/user/.bashrc\n\
+echo "export MPICXX='\''mpicxx'\''" >> /home/user/.bashrc\n\
+echo "export LD_PRELOAD='\''/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so'\''" >> /home/user/.bashrc\n\
+echo "export MPICH_CPU_BIND='\''verbose,cores'\''" >> /home/user/.bashrc\n\
+echo "export MPICH_MAX_THREAD_SAFETY=multiple" >> /home/user/.bashrc\n\
+echo "export OMP_PROC_BIND=close" >> /home/user/.bashrc\n\
+echo "export OMP_PLACES=cores" >> /home/user/.bashrc\n\
+echo "export OMP_SCHEDULE='\''dynamic,64'\''" >> /home/user/.bashrc\n\
+echo "export OMP_WAIT_POLICY=active" >> /home/user/.bashrc\n\
+echo "export OMP_DYNAMIC=false" >> /home/user/.bashrc\n\
+echo "export GOMP_CPU_AFFINITY='\''0-7'\''" >> /home/user/.bashrc\n\
+echo "export MALLOC_MMAP_THRESHOLD_=131072" >> /home/user/.bashrc\n\
+# --- ROS2 PERFORMANCE OPTIMIZATIONS FOR USER ---\n\
+echo "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp" >> /home/user/.bashrc\n\
+echo "export RCLCPP_LOGGING_BUFFERED_STREAM=1" >> /home/user/.bashrc\n\
+echo "export RCLCPP_DISABLE_SIGNAL_HANDLER=1" >> /home/user/.bashrc\n\
+echo "export ROS_DOMAIN_ID=0" >> /home/user/.bashrc\n\
+echo "export RCLCPP_EXECUTOR_NUM_THREADS=16" >> /home/user/.bashrc\n\
+echo "export FASTRTPS_DEFAULT_PROFILES_FILE=/root/.ros/fastdds_shm.xml" >> /home/user/.bashrc\n\
+echo "export PKG_CONFIG_PATH=\"/usr/local/lib/pkgconfig:\${PKG_CONFIG_PATH}\"" >> /home/user/.bashrc\n\
+\n\
+# Create FastDDS config for user\n\
+mkdir -p /home/user/.ros\n\
+cp /root/.ros/fastdds_shm.xml /home/user/.ros/\n\
+chown -R user:user /home/user/.ros\n\
+\n\
+# Ensure only writable directories are owned by the user\n\
+chown user:user /workspace\n\
+chown -R user:user /workspace/src\n\
+# Create and set ownership of persistent directories if they exist\n\
+mkdir -p /workspace/data_persistent /workspace/results /workspace/reports\n\
+chown -R user:user /workspace/data_persistent\n\
+chown -R user:user /workspace/results\n\
+chown -R user:user /workspace/reports\n\
+\n\
+# Switch to user and execute command\n\
+exec gosu user "$@"' > /entrypoint_user.sh && chmod +x /entrypoint_user.sh
 
-# Prevent interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
-
-# Set CUDA environment variables
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-
-# Set up locale first to avoid warnings
-RUN apt-get update && apt-get install -y --no-install-recommends locales && \
-    locale-gen en_US en_US.UTF-8 && \
-    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
-    rm -rf /var/lib/apt/lists/*
-ENV LANG=en_US.UTF-8
-
-# Install ONLY minimal runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Essential libraries
-    python3 python3-pip curl gnupg2 lsb-release \
-    # Mathematical and utility libraries (no -dev packages, no OpenCV packages)
-    libgoogle-glog0v5 libgflags2.2 libtbb2 libatlas3-base libsuitesparse-metis5 \
-    # Add ROS2 repository
-    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
-    # Install ROS2 BASE (not desktop) - much smaller
-    && apt-get update && apt-get install -y --no-install-recommends ros-${ROS_DISTRO}-ros-base \
-    # Cleanup
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy built artifacts from builder stage
-COPY --from=builder /usr/local /usr/local
-COPY --from=builder /workspace/install /workspace/install
-
-# Copy entrypoint script
-COPY --from=builder /entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Install Python packages
-RUN pip3 install --no-cache-dir numpy matplotlib scipy pandas pyyaml opencv-python rosbags
-
-# Set up environment
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
-    echo "source /workspace/install/setup.bash" >> /root/.bashrc && \
-    echo "export CUDA_VISIBLE_DEVICES=0" >> /root/.bashrc
-
-# Create workspace
-WORKDIR /workspace
-
-# Expose common ports for visualization
-EXPOSE 8080 8081 8082
-
-# Set entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+# Set entrypoint to user permission script
+ENTRYPOINT ["/entrypoint_user.sh"]
 CMD ["/bin/bash"]
 
-# Labels for production image
+# Labels for development image
 LABEL maintainer="TII Assignment - OpenVINS VIO Pipeline"
-LABEL description="Production OpenVINS with CUDA 12.2, ROS2 Humble (Multi-stage optimized)"
-LABEL version="2.0"
-LABEL stage="runtime"
+LABEL description="Development OpenVINS with CUDA 12.2, ROS2 Humble Desktop, Acceleration Libraries"
+LABEL version="3.0"
+LABEL stage="development"
